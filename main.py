@@ -9,18 +9,30 @@ app = FastAPI()
 
 START_DATE = datetime(2025, 7, 1)
 
+# =========================
+# DATABASE CONFIGURATION
+# =========================
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if DATABASE_URL:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 else:
-    # Local development database
+    # Use local SQLite database if Railway DB not available
     DATABASE_URL = "sqlite:///./local.db"
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+)
+
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
+
+# =========================
+# MODEL
+# =========================
 
 class Article(Base):
     __tablename__ = "articles"
@@ -32,11 +44,13 @@ class Article(Base):
 
 Base.metadata.create_all(bind=engine)
 
+# =========================
+# ROUTES
+# =========================
 
 @app.get("/")
 def home():
     return {"message": "CA Daily Backend Running with DB"}
-
 
 @app.get("/api/daily")
 def fetch_daily(date: str = Query(..., description="Format: YYYY-MM-DD")):
@@ -56,23 +70,20 @@ def fetch_daily(date: str = Query(..., description="Format: YYYY-MM-DD")):
 
     db = SessionLocal()
 
-    # Check if already stored
-    existing_articles = db.query(Article).filter(Article.date == selected_date.date()).all()
+    existing_articles = db.query(Article).filter(
+        Article.date == selected_date.date()
+    ).all()
 
     if existing_articles:
         return {
             "date": date,
             "status": "Loaded from database",
             "articles": [
-                {
-                    "title": article.title,
-                    "content": article.content
-                }
+                {"title": article.title, "content": article.content}
                 for article in existing_articles
             ]
         }
 
-    # If not stored yet (temporary demo insert)
     demo_article = Article(
         title="Demo Current Affair",
         date=selected_date.date(),
@@ -86,9 +97,6 @@ def fetch_daily(date: str = Query(..., description="Format: YYYY-MM-DD")):
         "date": date,
         "status": "Stored new data in database",
         "articles": [
-            {
-                "title": demo_article.title,
-                "content": demo_article.content
-            }
+            {"title": demo_article.title, "content": demo_article.content}
         ]
     }
